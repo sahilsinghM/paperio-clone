@@ -282,7 +282,7 @@ function respawnHuman() {
 // ============================================================
 // START SCREEN
 // ============================================================
-let playerColor = CFG.COLORS[0];
+let selectedColor = CFG.COLORS[0];
 
 const colorPickerEl = document.getElementById('color-picker');
 CFG.COLORS.forEach((c, i) => {
@@ -292,7 +292,7 @@ CFG.COLORS.forEach((c, i) => {
   swatch.addEventListener('click', () => {
     document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
     swatch.classList.add('selected');
-    playerColor = c;
+    selectedColor = c;
   });
   colorPickerEl.appendChild(swatch);
 });
@@ -308,7 +308,7 @@ function startGame() {
 
   const rawName = document.getElementById('player-name').value;
   const name    = sanitizeName(rawName);
-  window.humanPlayer = createPlayer(name, playerColor, false);
+  window.humanPlayer = createPlayer(name, selectedColor, false);
 
   for (let i = 0; i < CFG.BOT_COUNT; i++) {
     const usedColors = new Set(players.map(p => p.color));
