@@ -36,8 +36,8 @@ function createPlayerMesh(p) {
 
   const coneMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const cone    = new THREE.Mesh(coneGeo, coneMat);
-  cone.position.set(p.dx * 0.5, 0.35, p.dy * 0.5);
-  cone.rotation.z = Math.PI / 2;
+  cone.position.set(Math.cos(p.direction) * 0.45, 0.35, Math.sin(p.direction) * 0.45);
+  cone.rotation.set(0, -p.direction, Math.PI / 2);
   group.add(cone);
   group.userData.cone = cone;
 
@@ -94,9 +94,8 @@ export function syncPlayerMeshes(scene) {
 
     const cone = group.userData.cone;
     if (cone) {
-      const angle = Math.atan2(p.dx, p.dy);
-      cone.position.set(p.dx * 0.45, 0.35, p.dy * 0.45);
-      cone.rotation.set(0, angle, Math.PI/2);
+      cone.position.set(Math.cos(p.direction) * 0.45, 0.35, Math.sin(p.direction) * 0.45);
+      cone.rotation.set(0, -p.direction, Math.PI / 2);
     }
   }
 }

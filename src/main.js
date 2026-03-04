@@ -2,7 +2,8 @@ import { CFG } from './config.js';
 import { territory, state, TICK_MS, sanitizeName, applyRoundRectPolyfill } from './state.js';
 import { createPlayer, tickPlayers, respawnHuman } from './logic.js';
 import { tickAllBots } from './ai.js';
-import { initInput } from './input.js';
+import { initInput, applyTurnInput } from './input.js';
+import { initTrails, updateTrails } from './trail.js';
 import { initColorPicker, initHUD, drawHUD, tickKillFeed, tickFillAnims, addKillFeed } from './ui.js';
 
 import { initRenderer, updateCamera3d, render3d } from './renderer3d.js';
@@ -16,6 +17,7 @@ window.addEventListener('unhandledrejection', e => console.error('Unhandled reje
 
 const { scene, camera, renderer } = initRenderer(document.body);
 initCells(scene);
+initTrails(scene);
 initPlayerRenderer(document.body, camera);
 
 const canvas = renderer.domElement;
@@ -65,6 +67,7 @@ function gameLoop(ts) {
   if (!state.gameRunning) return;
   const dt=Math.min(ts-state.lastTime,100);
   state.lastTime=ts; state.tickAccum+=dt;
+  applyTurnInput();
   while (state.tickAccum>=TICK_MS) {
     tickAllBots(TICK_MS); tickPlayers(TICK_MS);
     state.tickAccum-=TICK_MS;
@@ -72,6 +75,7 @@ function gameLoop(ts) {
   updateCamera3d();
   updateCells(ts);
   syncPlayerMeshes(scene);
+  updateTrails();
   render3d();
   renderLabels(scene, camera);
   drawHUD(ts);

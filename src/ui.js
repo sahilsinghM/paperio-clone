@@ -1,5 +1,5 @@
 import { CFG } from './config.js';
-import { state, territory, trail, getTerritoryCount, hexToRgb, playerColor } from './state.js';
+import { state, territory, getTerritoryCount, hexToRgb, playerColor } from './state.js';
 
 export function addKillFeed(killerName, victimName, killerColor, victimColor) {
   const el = document.createElement('div');
@@ -117,15 +117,23 @@ function drawMinimap() {
   if (!hudCtx) return;
   const d = mmImgData.data;
   for (let i = 0; i < territory.length; i++) {
-    const t=territory[i], tr_=trail[i], pi=i*4;
-    if (tr_!==0) {
-      const [r,g,b]=hexToRgb(playerColor(tr_));
-      d[pi]=r;d[pi+1]=g;d[pi+2]=b;d[pi+3]=255;
-    } else if (t!==0) {
-      const [r,g,b]=hexToRgb(playerColor(t));
-      d[pi]=r*0.55|0;d[pi+1]=g*0.55|0;d[pi+2]=b*0.55|0;d[pi+3]=255;
+    const t = territory[i], pi = i * 4;
+    if (t !== 0) {
+      const [r,g,b] = hexToRgb(playerColor(t));
+      d[pi]=r*0.55|0; d[pi+1]=g*0.55|0; d[pi+2]=b*0.55|0; d[pi+3]=255;
     } else {
-      d[pi]=22;d[pi+1]=33;d[pi+2]=62;d[pi+3]=255;
+      d[pi]=22; d[pi+1]=33; d[pi+2]=62; d[pi+3]=255;
+    }
+  }
+  // Draw trail dots per player
+  for (const p of state.players) {
+    if (!p.alive) continue;
+    const [r,g,b] = hexToRgb(p.color);
+    for (const pt of p.trailPoints) {
+      const gx = Math.floor(pt.x), gy = Math.floor(pt.y);
+      if (gx < 0 || gx >= CFG.GRID_W || gy < 0 || gy >= CFG.GRID_H) continue;
+      const pi = (gy * CFG.GRID_W + gx) * 4;
+      d[pi]=r; d[pi+1]=g; d[pi+2]=b; d[pi+3]=255;
     }
   }
   mmCtx.putImageData(mmImgData,0,0);
