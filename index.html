@@ -332,14 +332,529 @@ document.getElementById('respawn-btn').addEventListener('click', () => {
   requestAnimationFrame(gameLoop);
 });
 
-// Placeholder game loop (replaced in Task 7)
-function gameLoop(ts) {
-  if (!gameRunning) return;
+// ============================================================
+// INPUT
+// ============================================================
+const DIR_MAP = {
+  ArrowUp:    { dx:  0, dy: -1 }, arrowup:    { dx:  0, dy: -1 },
+  ArrowDown:  { dx:  0, dy:  1 }, arrowdown:  { dx:  0, dy:  1 },
+  ArrowLeft:  { dx: -1, dy:  0 }, arrowleft:  { dx: -1, dy:  0 },
+  ArrowRight: { dx:  1, dy:  0 }, arrowright: { dx:  1, dy:  0 },
+  w: { dx: 0, dy: -1 }, s: { dx: 0, dy: 1 },
+  a: { dx: -1, dy: 0 }, d: { dx: 1, dy: 0 },
+};
+
+function queueDirection(dir) {
+  const h = window.humanPlayer;
+  if (!h || !h.alive || !gameRunning) return;
+  if (dir.dx === -h.dx && dir.dy === -h.dy) return; // no 180°
+  const last = h.inputQueue[h.inputQueue.length - 1];
+  if (last && last.dx === dir.dx && last.dy === dir.dy) return; // no duplicate
+  h.inputQueue.push({ ...dir });
+}
+
+document.addEventListener('keydown', e => {
+  const dir = DIR_MAP[e.key] || DIR_MAP[e.key.toLowerCase()];
+  if (!dir) return;
+  e.preventDefault();
+  queueDirection(dir);
+});
+
+// Touch swipe
+let touchStart = null;
+canvas.addEventListener('touchstart', e => {
+  touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: true });
+canvas.addEventListener('touchend', e => {
+  if (!touchStart) return;
+  const dx = e.changedTouches[0].clientX - touchStart.x;
+  const dy = e.changedTouches[0].clientY - touchStart.y;
+  touchStart = null;
+  if (Math.abs(dx) < 15 && Math.abs(dy) < 15) return;
+  const dir = Math.abs(dx) > Math.abs(dy)
+    ? (dx > 0 ? DIR_MAP.ArrowRight : DIR_MAP.ArrowLeft)
+    : (dy > 0 ? DIR_MAP.ArrowDown  : DIR_MAP.ArrowUp);
+  queueDirection(dir);
+}, { passive: true });
+
+// D-Pad
+const DPAD_DIRS = { up: DIR_MAP.ArrowUp, down: DIR_MAP.ArrowDown, left: DIR_MAP.ArrowLeft, right: DIR_MAP.ArrowRight };
+document.querySelectorAll('.dpad-btn').forEach(btn => {
+  btn.addEventListener('click', () => queueDirection(DPAD_DIRS[btn.dataset.dir]));
+});
+
+// ============================================================
+// GAME LOGIC — Movement & Collision
+// ============================================================
+
+function applyInput(p) {
+  if (!p.isBot && p.inputQueue.length > 0) {
+    const next = p.inputQueue.shift();
+    p.dx = next.dx; p.dy = next.dy;
+  }
+}
+
+function movePlayer(p) {
+  const nx = p.x + p.dx;
+  const ny = p.y + p.dy;
+
+  if (!inBounds(nx, ny)) {
+    // Bounce off wall
+    p.dx = -p.dx; p.dy = -p.dy;
+    return;
+  }
+
+  p.x = nx; p.y = ny;
+  const i = idx(p.x, p.y);
+
+  if (trail[i] === p.id) { killPlayer(p, null); return; }           // own trail → self-kill
+  if (trail[i] !== 0)    { killPlayer(getPlayerById(trail[i]), p); } // enemy trail → kill them
+
+  if (territory[i] === p.id && p.trail.size > 0) { claimTerritory(p); return; }
+
+  if (territory[i] !== p.id) {
+    trail[i] = p.id;
+    p.trail.add(i);
+  }
+}
+
+function killPlayer(victim, killer) {
+  if (!victim || !victim.alive) return;
+  victim.alive = false;
+
+  victim.trail.forEach(i => { trail[i] = 0; });
+  victim.trail.clear();
+
+  if (killer) {
+    killer.kills++;
+    addKillFeed(killer.name, victim.name, killer.color, victim.color);
+  }
+
+  if (!victim.isBot) {
+    const pct = ((getTerritoryCount(victim.id) / territory.length) * 100).toFixed(1);
+    document.getElementById('death-killer').textContent    = killer ? killer.name : 'the void';
+    document.getElementById('death-territory').textContent = pct + '%';
+    document.getElementById('death-kills').textContent     = String(victim.kills);
+    document.getElementById('death-screen').classList.remove('hidden');
+    gameRunning = false;
+  } else {
+    victim.respawnTimer = 2000;
+  }
+}
+
+function tickPlayers(dt) {
+  for (const p of players) {
+    if (!p.alive) {
+      if (p.isBot) { p.respawnTimer -= dt; if (p.respawnTimer <= 0) respawnBot(p); }
+      continue;
+    }
+    applyInput(p);
+    movePlayer(p);
+  }
+}
+
+// ============================================================
+// TERRITORY FLOOD FILL
+// ============================================================
+function claimTerritory(p) {
+  // Mark trail cells as territory, clear trail markers
+  p.trail.forEach(i => { territory[i] = p.id; trail[i] = 0; });
+  p.trail.clear();
+
+  // BFS from all 4 edges to find "outside" cells
+  // Anything not reachable from the edge (blocked by player's territory) is inside → captured
+  const outside = new Uint8Array(CFG.GRID_W * CFG.GRID_H);
+  const queue   = [];
+
+  function enqueue(x, y) {
+    const i = idx(x, y);
+    if (outside[i] || territory[i] === p.id) return;
+    outside[i] = 1;
+    queue.push(i);
+  }
+
+  for (let x = 0; x < CFG.GRID_W; x++) { enqueue(x, 0); enqueue(x, CFG.GRID_H-1); }
+  for (let y = 0; y < CFG.GRID_H; y++) { enqueue(0, y); enqueue(CFG.GRID_W-1, y); }
+
+  let qi = 0;
+  while (qi < queue.length) {
+    const i  = queue[qi++];
+    const cx = i % CFG.GRID_W;
+    const cy = (i / CFG.GRID_W) | 0;
+    if (cx > 0)            enqueue(cx-1, cy);
+    if (cx < CFG.GRID_W-1) enqueue(cx+1, cy);
+    if (cy > 0)            enqueue(cx, cy-1);
+    if (cy < CFG.GRID_H-1) enqueue(cx, cy+1);
+  }
+
+  const newCells = new Set();
+  for (let i = 0; i < territory.length; i++) {
+    if (!outside[i] && territory[i] !== p.id) {
+      territory[i] = p.id;
+      newCells.add(i);
+    }
+  }
+
+  if (newCells.size > 0) {
+    fillAnims.push({ cells: newCells, color: p.color, startTime: performance.now() });
+  }
+}
+
+// ============================================================
+// AI
+// ============================================================
+const BFS_DIRS = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+
+function bfsDirection(p, predicate, maxDist = 60) {
+  const visited = new Uint8Array(CFG.GRID_W * CFG.GRID_H);
+  const queue   = [{ x: p.x, y: p.y, dx: 0, dy: 0, dist: 0 }];
+  visited[idx(p.x, p.y)] = 1;
+
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur.dist > 0 && predicate(cur.x, cur.y)) return { dx: cur.dx, dy: cur.dy };
+    if (cur.dist >= maxDist) continue;
+    for (const d of BFS_DIRS) {
+      const nx = cur.x + d.dx, ny = cur.y + d.dy;
+      if (!inBounds(nx, ny)) continue;
+      const ni = idx(nx, ny);
+      if (visited[ni] || trail[ni] === p.id) continue;
+      visited[ni] = 1;
+      queue.push({ x: nx, y: ny,
+        dx: cur.dist === 0 ? d.dx : cur.dx,
+        dy: cur.dist === 0 ? d.dy : cur.dy,
+        dist: cur.dist + 1 });
+    }
+  }
+  return null;
+}
+
+function isOpposite(p, d) { return p.dx === -d.dx && p.dy === -d.dy; }
+
+function safeSetDir(p, dir) {
+  if (!dir || isOpposite(p, dir)) return;
+  p.dx = dir.dx; p.dy = dir.dy;
+}
+
+function randomTurn(p) {
+  const opts = BFS_DIRS.filter(d => !isOpposite(p, d));
+  return opts[Math.floor(Math.random() * opts.length)];
+}
+
+function tickBot(p, dt) {
+  p.botTimer -= dt;
+  if (p.botTimer > 0) return;
+  p.botTimer = CFG.BOT_THINK_MS + Math.random() * 80;
+
+  const onHome   = territory[idx(p.x, p.y)] === p.id;
+  const trailLen = p.trail.size;
+
+  // State transitions
+  if (trailLen > CFG.TRAIL_LIMIT) p.botState = 'retreat';
+  if (p.botState === 'retreat' && onHome && trailLen === 0) p.botState = 'expand';
+
+  // Opportunistic attack: if adjacent enemy trail with short own trail
+  if (p.botState === 'expand' && trailLen < 20) {
+    for (const d of BFS_DIRS) {
+      const nx = p.x + d.dx, ny = p.y + d.dy;
+      if (!inBounds(nx, ny)) continue;
+      const ni = idx(nx, ny);
+      if (trail[ni] !== 0 && trail[ni] !== p.id) {
+        p.botState = 'attack';
+        safeSetDir(p, d);
+        return;
+      }
+    }
+  }
+
+  if (p.botState === 'retreat') {
+    safeSetDir(p, bfsDirection(p, (x,y) => territory[idx(x,y)] === p.id, 100) || randomTurn(p));
+
+  } else if (p.botState === 'attack') {
+    const ahead = { x: p.x + p.dx, y: p.y + p.dy };
+    if (!inBounds(ahead.x, ahead.y) || territory[idx(ahead.x, ahead.y)] === p.id)
+      p.botState = 'expand';
+
+  } else { // expand
+    const dir = bfsDirection(p, (x,y) => {
+      const t = territory[idx(x,y)];
+      return t === 0 || t !== p.id;
+    }, 60);
+    safeSetDir(p, dir || randomTurn(p));
+  }
+}
+
+function tickAllBots(dt) {
+  for (const p of players) if (p.isBot && p.alive) tickBot(p, dt);
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+const minimapCanvas  = document.createElement('canvas');
+minimapCanvas.width  = CFG.GRID_W;
+minimapCanvas.height = CFG.GRID_H;
+const minimapCtx     = minimapCanvas.getContext('2d');
+const minimapImgData = minimapCtx.createImageData(CFG.GRID_W, CFG.GRID_H);
+
+function updateCamera() {
+  const h = window.humanPlayer;
+  if (!h) return;
+  const tx = h.x * CFG.CELL - canvas.width  / 2 + CFG.CELL / 2;
+  const ty = h.y * CFG.CELL - canvas.height / 2 + CFG.CELL / 2;
+  cam.x += (tx - cam.x) * 0.12;
+  cam.y += (ty - cam.y) * 0.12;
+}
+
+function drawGrid(now) {
+  const startX = Math.max(0, (cam.x / CFG.CELL) | 0);
+  const startY = Math.max(0, (cam.y / CFG.CELL) | 0);
+  const endX   = Math.min(CFG.GRID_W, startX + ((canvas.width  / CFG.CELL) | 0) + 2);
+  const endY   = Math.min(CFG.GRID_H, startY + ((canvas.height / CFG.CELL) | 0) + 2);
+
   ctx.fillStyle = '#16213e';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Background grid dots
+  ctx.fillStyle = '#1a2540';
+  for (let y = startY; y < endY; y++) {
+    for (let x = startX; x < endX; x++) {
+      ctx.fillRect(x * CFG.CELL - cam.x, y * CFG.CELL - cam.y, CFG.CELL - 1, CFG.CELL - 1);
+    }
+  }
+
+  // Build fill animation overlay
+  const animOverlay = new Map();
+  for (const anim of fillAnims) {
+    const brightness = 1 + (1 - Math.min((now - anim.startTime) / CFG.FILL_ANIM_MS, 1)) * 0.7;
+    anim.cells.forEach(ci => animOverlay.set(ci, { color: anim.color, brightness }));
+  }
+
+  // Territory + trail cells
+  for (let y = startY; y < endY; y++) {
+    for (let x = startX; x < endX; x++) {
+      const i  = idx(x, y);
+      const t  = territory[i];
+      const tr = trail[i];
+      const sx = x * CFG.CELL - cam.x;
+      const sy = y * CFG.CELL - cam.y;
+
+      if (t !== 0) {
+        const anim = animOverlay.get(i);
+        if (anim) {
+          const [r,g,b] = hexToRgb(anim.color);
+          const f = anim.brightness;
+          ctx.fillStyle = `rgb(${Math.min(255,r*f)|0},${Math.min(255,g*f)|0},${Math.min(255,b*f)|0})`;
+        } else {
+          const [r,g,b] = hexToRgb(playerColor(t));
+          ctx.fillStyle = `rgb(${r*0.5|0},${g*0.5|0},${b*0.5|0})`;
+        }
+        ctx.fillRect(sx, sy, CFG.CELL - 1, CFG.CELL - 1);
+      }
+
+      if (tr !== 0) {
+        ctx.fillStyle = playerColor(tr);
+        ctx.fillRect(sx + 2, sy + 2, CFG.CELL - 5, CFG.CELL - 5);
+      }
+    }
+  }
+
+  // Territory border glow for human player
+  const h = window.humanPlayer;
+  if (h && h.alive) {
+    ctx.strokeStyle = h.color + 'bb';
+    ctx.lineWidth   = 1.5;
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        if (territory[idx(x,y)] !== h.id) continue;
+        const hasEdge =
+          (inBounds(x+1,y) && territory[idx(x+1,y)] !== h.id) ||
+          (inBounds(x-1,y) && territory[idx(x-1,y)] !== h.id) ||
+          (inBounds(x,y+1) && territory[idx(x,y+1)] !== h.id) ||
+          (inBounds(x,y-1) && territory[idx(x,y-1)] !== h.id);
+        if (hasEdge) {
+          ctx.strokeRect(x * CFG.CELL - cam.x + 0.5, y * CFG.CELL - cam.y + 0.5, CFG.CELL - 2, CFG.CELL - 2);
+        }
+      }
+    }
+  }
+}
+
+function drawPlayers() {
+  for (const p of players) {
+    if (!p.alive) continue;
+    const sx = p.x * CFG.CELL - cam.x + CFG.CELL / 2;
+    const sy = p.y * CFG.CELL - cam.y + CFG.CELL / 2;
+    const r  = CFG.CELL * 0.55;
+
+    ctx.save();
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur  = 14;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.restore();
+
+    // Direction indicator dot
+    ctx.beginPath();
+    ctx.arc(sx + p.dx * r * 0.5, sy + p.dy * r * 0.5, r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fill();
+
+    // Name label (always for human, only nearby for bots)
+    const dist = Math.hypot(p.x - humanPlayer.x, p.y - humanPlayer.y);
+    if (!p.isBot || dist < 25) {
+      ctx.fillStyle  = '#fff';
+      ctx.font       = 'bold 11px sans-serif';
+      ctx.textAlign  = 'center';
+      ctx.fillText(p.name, sx, sy - r - 4);
+    }
+  }
+  ctx.textAlign = 'left';
+}
+
+function drawMinimap() {
+  const d = minimapImgData.data;
+  for (let i = 0; i < territory.length; i++) {
+    const t  = territory[i];
+    const tr = trail[i];
+    const pi = i * 4;
+    if (tr !== 0) {
+      const [r,g,b] = hexToRgb(playerColor(tr));
+      d[pi]=r; d[pi+1]=g; d[pi+2]=b; d[pi+3]=255;
+    } else if (t !== 0) {
+      const [r,g,b] = hexToRgb(playerColor(t));
+      d[pi]=r*0.55|0; d[pi+1]=g*0.55|0; d[pi+2]=b*0.55|0; d[pi+3]=255;
+    } else {
+      d[pi]=22; d[pi+1]=33; d[pi+2]=62; d[pi+3]=255;
+    }
+  }
+  minimapCtx.putImageData(minimapImgData, 0, 0);
+
+  const mx = canvas.width  - CFG.MINIMAP_SIZE - CFG.MINIMAP_PAD;
+  const my = CFG.MINIMAP_PAD;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(mx - 2, my - 2, CFG.MINIMAP_SIZE + 4, CFG.MINIMAP_SIZE + 4);
+  ctx.drawImage(minimapCanvas, mx, my, CFG.MINIMAP_SIZE, CFG.MINIMAP_SIZE);
+
+  // Player dots
+  for (const p of players) {
+    if (!p.alive) continue;
+    const px = mx + (p.x / CFG.GRID_W) * CFG.MINIMAP_SIZE;
+    const py = my + (p.y / CFG.GRID_H) * CFG.MINIMAP_SIZE;
+    ctx.beginPath();
+    ctx.arc(px, py, p.isBot ? 2 : 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = p.isBot ? p.color : '#fff';
+    ctx.fill();
+  }
+}
+
+function drawLeaderboard() {
+  const total  = territory.length;
+  const ranked = [...players]
+    .filter(p => p.alive)
+    .map(p => ({ name: p.name, color: p.color, pct: (getTerritoryCount(p.id) / total * 100).toFixed(1) }))
+    .sort((a,b) => b.pct - a.pct)
+    .slice(0, 5);
+
+  const lx = 16, ly = 80, lw = 190, lh = 28 + ranked.length * 26;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath(); ctx.roundRect(lx, ly, lw, lh, 8); ctx.fill();
+  ctx.fillStyle = '#999'; ctx.font = 'bold 10px sans-serif';
+  ctx.fillText('LEADERBOARD', lx + 10, ly + 18);
+
+  ranked.forEach((e, i) => {
+    const ey = ly + 28 + i * 26;
+    ctx.fillStyle = e.color;
+    ctx.fillRect(lx + 10, ey, 10, 10);
+    ctx.fillStyle = '#fff'; ctx.font = '13px sans-serif';
+    ctx.fillText(e.name, lx + 26, ey + 10);
+    ctx.fillStyle = '#aaa'; ctx.font = '12px sans-serif';
+    ctx.fillText(e.pct + '%', lx + lw - 42, ey + 10);
+  });
+}
+
+function drawScore() {
+  const h    = window.humanPlayer;
+  const pct  = (getTerritoryCount(h.id) / territory.length * 100).toFixed(1);
+  const text = `${pct}%  |  Kills: ${h.kills}`;
+
+  ctx.font = 'bold 16px sans-serif';
+  const tw = ctx.measureText(text).width;
+  const bx = (canvas.width - tw) / 2 - 16;
+  const by = canvas.height - 48;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath(); ctx.roundRect(bx, by, tw + 32, 32, 16); ctx.fill();
   ctx.fillStyle = '#fff';
-  ctx.font = '18px sans-serif';
-  ctx.fillText(`Players: ${players.length}  Human: ${humanPlayer.x},${humanPlayer.y}`, 20, 40);
+  ctx.fillText(text, bx + 16, by + 21);
+}
+
+// ============================================================
+// UI — Kill Feed (safe DOM construction)
+// ============================================================
+function addKillFeed(killerName, victimName, killerColor, victimColor) {
+  const el = document.createElement('div');
+  el.className = 'kill-entry';
+  el.style.borderLeftColor = killerColor;
+
+  const killerSpan = document.createElement('span');
+  killerSpan.style.color = killerColor;
+  killerSpan.textContent = killerName;
+
+  const sep = document.createTextNode(' eliminated ');
+
+  const victimSpan = document.createElement('span');
+  victimSpan.style.color = victimColor;
+  victimSpan.textContent = victimName;
+
+  el.appendChild(killerSpan);
+  el.appendChild(sep);
+  el.appendChild(victimSpan);
+
+  document.getElementById('kill-feed').appendChild(el);
+  killFeed.push({ el, time: performance.now() });
+}
+
+function tickKillFeed(now) {
+  for (let i = killFeed.length - 1; i >= 0; i--) {
+    const age = now - killFeed[i].time;
+    if (age > CFG.KILL_FEED_MS) { killFeed[i].el.remove(); killFeed.splice(i, 1); }
+    else if (age > CFG.KILL_FEED_MS - 500) killFeed[i].el.style.opacity = String((CFG.KILL_FEED_MS - age) / 500);
+  }
+}
+
+function tickFillAnims(now) {
+  for (let i = fillAnims.length - 1; i >= 0; i--)
+    if (now - fillAnims[i].startTime > CFG.FILL_ANIM_MS) fillAnims.splice(i, 1);
+}
+
+// ============================================================
+// GAME LOOP
+// ============================================================
+function gameLoop(ts) {
+  if (!gameRunning) return;
+
+  const dt   = Math.min(ts - lastTime, 100);
+  lastTime   = ts;
+  tickAccum += dt;
+
+  while (tickAccum >= TICK_MS) {
+    tickAllBots(TICK_MS);
+    tickPlayers(TICK_MS);
+    tickAccum -= TICK_MS;
+  }
+
+  updateCamera();
+  drawGrid(ts);
+  drawPlayers();
+  drawMinimap();
+  drawLeaderboard();
+  drawScore();
+  tickFillAnims(ts);
+  tickKillFeed(ts);
+
   requestAnimationFrame(gameLoop);
 }
 </script>
