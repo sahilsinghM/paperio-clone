@@ -23,7 +23,7 @@ initInput(canvas);
 initHUD();
 
 let selectedColor = CFG.COLORS[0];
-const getSelectedColor = initColorPicker(c => { selectedColor = c; });
+initColorPicker(c => { selectedColor = c; });
 const BOT_NAMES = ['Zara','Nova','Pixel','Echo','Blaze','Frost','Vex','Onyx','Cleo'];
 
 export function startGame() {

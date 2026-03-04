@@ -1,0 +1,15 @@
+export const CFG = {
+  GRID_W:       250,
+  GRID_H:       250,
+  CELL:         16,
+  SPEED:        8,
+  BOT_COUNT:    9,
+  TRAIL_LIMIT:  300,
+  BOT_THINK_MS: 180,
+  FILL_ANIM_MS: 350,
+  KILL_FEED_MS: 4000,
+  MINIMAP_SIZE: 150,
+  MINIMAP_PAD:  12,
+  COLORS: ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
+           '#1abc9c','#e91e63','#ff5722','#00bcd4','#8bc34a'],
+};

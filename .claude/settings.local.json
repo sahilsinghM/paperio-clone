@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init)",
+      "Bash(git add index.html docs/)",
+      "Bash(git commit -m \"feat: canvas shell, config, state, player creation, start screen\")",
+      "Bash(git config user.email \"dev@paperio.local\")",
+      "Bash(git config user.name \"Developer\")",
+      "Bash(git add index.html)",
+      "Bash(git commit -m \"feat: complete rendering, kill feed, game loop, AI bots\")",
+      "Bash(git commit -m \"chore: final paper.io clone — fully playable\")",
+      "Bash(git commit --allow-empty -m \"chore: final paper.io clone — fully playable\")",
+      "Bash(git commit -m \"fix: return after enemy-trail kill, O\\(1\\) BFS dequeue in bfsDirection\")",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "Bash(git commit -m \"fix: rename playerColor variable to selectedColor \\(shadowed function playerColor\\)\")",
+      "Bash(kill 20665)",
+      "Bash(gh repo create paperio-clone --public --source=. --remote=origin --push)",
+      "Bash(git --version)",
+      "Bash(git remote add origin https://github.com/sahilsinghM/paperio-clone.git)",
+      "Bash(git push -u origin master)",
+      "Bash(git push -u origin main)",
+      "Bash(vercel --version)",
+      "Bash(npm install -g vercel)",
+      "Bash(vercel login)",
+      "Bash(vercel --prod --yes)",
+      "WebFetch(domain:games.voodoo.io)",
+      "Bash(git add docs/)",
+      "Bash(git commit -m \"docs: 3D rendering design — Three.js InstancedMesh approach\")",
+      "Bash(npx playwright test --reporter=line)",
+      "Bash(git add src/logic.js src/main.js tests/game.spec.js)",
+      "Bash(git commit -m \"fix: human death shows death screen via playerKilled CustomEvent\")",
+      "Bash(git add src/renderer3d.js)",
+      "Bash(git commit -m \"fix: PerspectiveCamera 60deg + scene.add\\(sun.target\\) for correct shadows\")",
+      "Bash(git add src/cells.js src/players3d.js)",
+      "Bash(git commit -m \"perf: hoist brightMap and Vector3 out of animation frame loop\")",
+      "Bash(git add -A)",
+      "Bash(git commit -m \"chore: remove debug logs, dead code, stray spec file; fix .gitignore\")"
+    ]
+  }
+}
