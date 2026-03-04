@@ -408,7 +408,7 @@ function movePlayer(p) {
   const i = idx(p.x, p.y);
 
   if (trail[i] === p.id) { killPlayer(p, null); return; }           // own trail → self-kill
-  if (trail[i] !== 0)    { killPlayer(getPlayerById(trail[i]), p); } // enemy trail → kill them
+  if (trail[i] !== 0)    { killPlayer(getPlayerById(trail[i]), p); return; } // enemy trail → kill them
 
   if (territory[i] === p.id && p.trail.size > 0) { claimTerritory(p); return; }
 
@@ -510,8 +510,9 @@ function bfsDirection(p, predicate, maxDist = 60) {
   const queue   = [{ x: p.x, y: p.y, dx: 0, dy: 0, dist: 0 }];
   visited[idx(p.x, p.y)] = 1;
 
-  while (queue.length > 0) {
-    const cur = queue.shift();
+  let qi = 0;
+  while (qi < queue.length) {
+    const cur = queue[qi++];
     if (cur.dist > 0 && predicate(cur.x, cur.y)) return { dx: cur.dx, dy: cur.dy };
     if (cur.dist >= maxDist) continue;
     for (const d of BFS_DIRS) {
