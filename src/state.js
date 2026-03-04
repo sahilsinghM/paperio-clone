@@ -1,7 +1,7 @@
 import { CFG } from './config.js';
 
 export const territory = new Uint8Array(CFG.GRID_W * CFG.GRID_H);
-export const trail     = new Uint8Array(CFG.GRID_W * CFG.GRID_H);
+// NOTE: trail[] removed — trails are now player.trailPoints arrays
 
 export const state = {
   players:     [],
@@ -14,19 +14,19 @@ export const state = {
   fillAnims:   [],
 };
 
-export const TICK_MS = 1000 / CFG.SPEED;
+export const TICK_MS = 1000 / CFG.TICK_RATE;
 
-export function idx(x, y)      { return y * CFG.GRID_W + x; }
+export function idx(x, y)      { return ((y | 0) * CFG.GRID_W + (x | 0)); }
 export function inBounds(x, y) { return x >= 0 && x < CFG.GRID_W && y >= 0 && y < CFG.GRID_H; }
 
 export function randomEmptyCell() {
   let x, y, attempts = 0;
   do {
-    x = 10 + Math.floor(Math.random() * (CFG.GRID_W - 20));
-    y = 10 + Math.floor(Math.random() * (CFG.GRID_H - 20));
+    x = 15 + Math.floor(Math.random() * (CFG.GRID_W - 30));
+    y = 15 + Math.floor(Math.random() * (CFG.GRID_H - 30));
     attempts++;
   } while (territory[idx(x, y)] !== 0 && attempts < 500);
-  return { x, y };
+  return { x: x + 0.5, y: y + 0.5 }; // float center of cell
 }
 
 export function getPlayerById(id)   { return state.players.find(p => p.id === id); }

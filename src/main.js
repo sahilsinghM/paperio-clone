@@ -1,5 +1,5 @@
 import { CFG } from './config.js';
-import { territory, trail, state, TICK_MS, sanitizeName, applyRoundRectPolyfill } from './state.js';
+import { territory, state, TICK_MS, sanitizeName, applyRoundRectPolyfill } from './state.js';
 import { createPlayer, tickPlayers, respawnHuman } from './logic.js';
 import { tickAllBots } from './ai.js';
 import { initInput } from './input.js';
@@ -27,7 +27,7 @@ initColorPicker(c => { selectedColor = c; });
 const BOT_NAMES = ['Zara','Nova','Pixel','Echo','Blaze','Frost','Vex','Onyx','Cleo'];
 
 export function startGame() {
-  territory.fill(0); trail.fill(0);
+  territory.fill(0);
   state.players=[]; state.nextId=1;
   state.killFeed.length=0; state.fillAnims.length=0;
   state.humanPlayer = createPlayer(sanitizeName(document.getElementById('player-name').value), selectedColor, false);
