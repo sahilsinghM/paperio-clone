@@ -1,3 +1,6 @@
 .vercel
 node_modules/
 test-results/
+.claude/
+.playwright-mcp/
+game-running.png
