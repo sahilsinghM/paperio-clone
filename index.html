@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Paper.io 2</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
     body { background: #1a1a2e; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
-    #game { display: block; }
+    #game { display: block; touch-action: none; }
 
     .screen {
       position: fixed; inset: 0;
@@ -15,6 +15,9 @@
       align-items: center; justify-content: center;
       background: rgba(10, 10, 30, 0.92);
       z-index: 100;
+      padding: 24px;
+      padding-top: max(24px, env(safe-area-inset-top));
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
     }
     .screen.hidden { display: none; }
 
@@ -27,10 +30,11 @@
       border: 2px solid #444; background: #222; color: #fff;
       margin-bottom: 1.5rem; text-align: center; width: 240px;
       outline: none; transition: border-color 0.2s;
+      user-select: text; -webkit-user-select: text;
     }
     .name-input:focus { border-color: #4af; }
 
-    .color-picker { display: flex; gap: 12px; margin-bottom: 2rem; }
+    .color-picker { display: flex; gap: 12px; margin-bottom: 2rem; flex-wrap: wrap; justify-content: center; }
     .color-swatch {
       width: 36px; height: 36px; border-radius: 50%;
       cursor: pointer; border: 3px solid transparent;
@@ -46,8 +50,9 @@
       color: #fff; letter-spacing: 1px;
       transition: transform 0.15s, box-shadow 0.15s;
       box-shadow: 0 4px 20px rgba(68,170,255,0.4);
+      touch-action: manipulation;
     }
-    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(68,170,255,0.5); }
+    .btn:hover  { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(68,170,255,0.5); }
     .btn:active { transform: translateY(0); }
 
     #death-screen .stat { color: #ccc; font-size: 1.1rem; margin: 0.3rem 0; }
@@ -55,7 +60,9 @@
     #death-screen h2 { color: #ff6b6b; font-size: 2rem; margin-bottom: 1rem; }
 
     #kill-feed {
-      position: fixed; top: 16px; left: 16px;
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      left: max(16px, env(safe-area-inset-left));
       display: flex; flex-direction: column; gap: 6px;
       pointer-events: none; z-index: 50;
     }
@@ -68,25 +75,48 @@
     }
     @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } }
 
-    #dpad {
-      position: fixed; bottom: 24px; left: 24px;
-      display: none; z-index: 50;
-    }
-    @media (max-width: 768px) {
-      #dpad {
-        display: grid;
-        grid-template-columns: 48px 48px 48px;
-        grid-template-rows: 48px 48px 48px;
-        gap: 4px;
-      }
-    }
-    .dpad-btn {
-      background: rgba(255,255,255,0.15); border: none; border-radius: 8px;
-      color: #fff; font-size: 1.4rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
+    /* ── Mobile turn buttons ─────────────────────────────────────────────── */
+    .turn-btn {
+      position: fixed;
+      bottom: calc(28px + env(safe-area-inset-bottom));
+      width: 88px; height: 88px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.10);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: #fff; font-size: 2.2rem;
+      cursor: pointer;
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 50;
+      touch-action: manipulation;
       transition: background 0.1s;
     }
-    .dpad-btn:active { background: rgba(255,255,255,0.35); }
+    .turn-btn:active { background: rgba(255,255,255,0.28); }
+    #turn-left-btn  { left:  calc(24px + env(safe-area-inset-left)); }
+    #turn-right-btn { right: calc(24px + env(safe-area-inset-right)); }
+
+    /* Show on any touch/coarse-pointer device */
+    @media (pointer: coarse) {
+      .turn-btn { display: flex; }
+    }
+
+    /* ── Responsive start screen ─────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .screen h1 { font-size: 2.2rem; }
+      .screen p  { font-size: 0.9rem; margin-bottom: 1.4rem; }
+      .color-swatch { width: 44px; height: 44px; }
+      .name-input { width: 100%; max-width: 280px; }
+      #death-screen h2   { font-size: 1.6rem; }
+      #death-screen .stat { font-size: 1rem; }
+    }
+    @media (max-height: 600px) {
+      .screen h1 { font-size: 1.8rem; margin-bottom: 0.3rem; }
+      .screen p  { margin-bottom: 1rem; }
+      .color-picker { margin-bottom: 1rem; }
+      .name-input { margin-bottom: 1rem; }
+    }
   </style>
 </head>
 <body>
@@ -94,7 +124,7 @@
 <div id="start-screen" class="screen">
   <h1>Paper.io 2</h1>
   <p>Claim territory. Eliminate rivals.</p>
-  <input id="player-name" class="name-input" type="text" placeholder="Your name" maxlength="16" value="Player">
+  <input id="player-name" class="name-input" type="text" placeholder="Your name" maxlength="16" value="Player" autocomplete="off" autocorrect="off" spellcheck="false">
   <div class="color-picker" id="color-picker"></div>
   <button class="btn" id="play-btn">PLAY</button>
 </div>
@@ -110,17 +140,8 @@
 
 <div id="kill-feed"></div>
 
-<div id="dpad">
-  <div></div>
-  <button class="dpad-btn" data-dir="up" aria-label="Move up">↑</button>
-  <div></div>
-  <button class="dpad-btn" data-dir="left" aria-label="Move left">←</button>
-  <div></div>
-  <button class="dpad-btn" data-dir="right" aria-label="Move right">→</button>
-  <div></div>
-  <button class="dpad-btn" data-dir="down" aria-label="Move down">↓</button>
-  <div></div>
-</div>
+<button class="turn-btn" id="turn-left-btn"  aria-label="Turn left">&#9664;</button>
+<button class="turn-btn" id="turn-right-btn" aria-label="Turn right">&#9654;</button>
 
 <canvas id="game"></canvas>
 

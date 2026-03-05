@@ -16,6 +16,10 @@ export function applyTurnInput() {
   h.turnInput = t;
 }
 
+function vibrate(ms) {
+  if (navigator.vibrate) navigator.vibrate(ms);
+}
+
 export function initInput(canvas) {
   document.addEventListener('keydown', e => {
     if ([...TURN_LEFT, ...TURN_RIGHT].includes(e.key)) {
@@ -25,7 +29,7 @@ export function initInput(canvas) {
   });
   document.addEventListener('keyup', e => held.delete(e.key));
 
-  // Touch swipe → set player direction angle
+  // Touch swipe on canvas → snap to swiped direction
   let touchStart = null;
   canvas.addEventListener('touchstart', e => {
     touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -40,13 +44,22 @@ export function initInput(canvas) {
     if (h && h.alive) h.direction = Math.atan2(dy, dx);
   }, { passive: true });
 
-  // D-pad: hold down = turn, release = straight
-  document.querySelectorAll('.dpad-btn').forEach(btn => {
-    const dir = btn.dataset.dir;
-    const key = dir === 'left' ? 'ArrowLeft' : dir === 'right' ? 'ArrowRight' : null;
-    if (!key) return;
-    btn.addEventListener('pointerdown', () => held.add(key));
-    btn.addEventListener('pointerup',   () => held.delete(key));
-    btn.addEventListener('pointerleave',() => held.delete(key));
-  });
+  // Turn buttons: hold = continuous turn, haptic on press
+  const leftBtn  = document.getElementById('turn-left-btn');
+  const rightBtn = document.getElementById('turn-right-btn');
+
+  function bindTurnBtn(btn, key) {
+    if (!btn) return;
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      held.add(key);
+      vibrate(18);
+    });
+    btn.addEventListener('pointerup',    () => held.delete(key));
+    btn.addEventListener('pointerleave', () => held.delete(key));
+    btn.addEventListener('pointercancel',() => held.delete(key));
+  }
+
+  bindTurnBtn(leftBtn,  'ArrowLeft');
+  bindTurnBtn(rightBtn, 'ArrowRight');
 }
