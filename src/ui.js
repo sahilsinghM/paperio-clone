@@ -68,8 +68,9 @@ export function drawHUD(now) {
   if (!hudCtx || !state.humanPlayer) return;
   hudCtx.clearRect(0, 0, hudCanvas.width, hudCanvas.height);
   drawLeaderboard();
-  drawScore();
+  drawScore(now);
   drawMinimap();
+  drawDangerWarning(now);
 }
 
 function drawLeaderboard() {
@@ -93,18 +94,72 @@ function drawLeaderboard() {
   });
 }
 
-function drawScore() {
+function drawScore(now) {
   const h   = state.humanPlayer;
   if (!h || !h.alive) return;
   const pct = (getTerritoryCount(h.id)/territory.length*100).toFixed(1);
   const text= `${pct}%  |  Kills: ${h.kills}`;
   hudCtx.font='bold 16px sans-serif';
   const tw=hudCtx.measureText(text).width;
-  const bx=(hudCanvas.width-tw)/2-16, by=hudCanvas.height-48;
+  const bx=(hudCanvas.width-tw)/2-16, by=hudCanvas.height-56;
   hudCtx.fillStyle='rgba(0,0,0,0.55)';
   hudCtx.beginPath(); hudCtx.roundRect(bx,by,tw+32,32,16); hudCtx.fill();
   hudCtx.fillStyle='#fff';
   hudCtx.fillText(text,bx+16,by+21);
+
+  // Trail danger gauge
+  const trailLen = h.trailPoints.length;
+  if (trailLen > 0) {
+    const gaugeW = tw + 32;
+    const gaugeH = 5;
+    const gy2    = by + 36;
+    const pct2   = Math.min(trailLen / CFG.TRAIL_LIMIT, 1);
+    const danger  = trailLen >= CFG.TRAIL_WARN;
+
+    // Background track
+    hudCtx.fillStyle = 'rgba(0,0,0,0.4)';
+    hudCtx.beginPath(); hudCtx.roundRect(bx, gy2, gaugeW, gaugeH, 3); hudCtx.fill();
+
+    // Fill: green → yellow → red
+    const r = Math.round(Math.min(1, pct2 * 2) * 255);
+    const g = Math.round(Math.min(1, (1 - pct2) * 2) * 200);
+    hudCtx.fillStyle = `rgb(${r},${g},0)`;
+    hudCtx.beginPath(); hudCtx.roundRect(bx, gy2, gaugeW * pct2, gaugeH, 3); hudCtx.fill();
+
+    // Pulse glow when in danger zone
+    if (danger) {
+      const pulse = 0.4 + 0.6 * Math.abs(Math.sin(now / 250));
+      hudCtx.fillStyle = `rgba(255,60,60,${pulse * 0.35})`;
+      hudCtx.beginPath(); hudCtx.roundRect(bx - 2, gy2 - 2, gaugeW + 4, gaugeH + 4, 4); hudCtx.fill();
+    }
+  }
+}
+
+function drawDangerWarning(now) {
+  const h = state.humanPlayer;
+  if (!h || !h.alive) return;
+  if (h.trailPoints.length < CFG.TRAIL_WARN) return;
+
+  // Flashing "RETURN TO BASE!" banner
+  const pulse = 0.5 + 0.5 * Math.abs(Math.sin(now / 300));
+  const alpha = 0.7 + 0.3 * pulse;
+  const cx = hudCanvas.width / 2;
+  const cy = hudCanvas.height * 0.22;
+
+  hudCtx.save();
+  hudCtx.font = 'bold 22px sans-serif';
+  hudCtx.textAlign = 'center';
+  const msg = '⚠ RETURN TO BASE!';
+  const tw  = hudCtx.measureText(msg).width;
+
+  // Backdrop
+  hudCtx.fillStyle = `rgba(180,0,0,${alpha * 0.55})`;
+  hudCtx.beginPath(); hudCtx.roundRect(cx - tw/2 - 18, cy - 22, tw + 36, 34, 8); hudCtx.fill();
+
+  // Text
+  hudCtx.fillStyle = `rgba(255,200,200,${alpha})`;
+  hudCtx.fillText(msg, cx, cy);
+  hudCtx.restore();
 }
 
 const minimapOffscreen = document.createElement('canvas');

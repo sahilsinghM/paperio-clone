@@ -10,6 +10,15 @@ const HALF_H = CFG.GRID_H / 2;
 const _camTarget  = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
 
+// ─── Screen shake ────────────────────────────────────────────────────────────
+let _shakeEnd       = 0;
+let _shakeIntensity = 0;
+
+export function triggerScreenShake(durationMs = 350, intensity = 0.6) {
+  _shakeEnd       = performance.now() + durationMs;
+  _shakeIntensity = intensity;
+}
+
 export function initRenderer(container) {
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -50,7 +59,7 @@ export function initRenderer(container) {
   scene.add(grid);
 
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 18, 12);
+  camera.position.set(0, 15, 12);
   camera.lookAt(0, 0, 0);
 
   window.addEventListener('resize', onResize);
@@ -82,6 +91,16 @@ export function updateCamera3d() {
 
   _lookTarget.set(wx, 0, wz);
   camera.lookAt(_lookTarget);
+
+  // Screen shake
+  const now = performance.now();
+  if (now < _shakeEnd) {
+    const t = (_shakeEnd - now) / 350;           // 1→0 as shake fades
+    const s = t * _shakeIntensity;
+    camera.position.x += (Math.random() - 0.5) * s;
+    camera.position.y += (Math.random() - 0.5) * s * 0.4;
+    camera.position.z += (Math.random() - 0.5) * s;
+  }
 
   sun.position.set(wx + 100, 150, wz + 80);
   sun.target.position.set(wx, 0, wz);
