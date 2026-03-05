@@ -27,8 +27,9 @@ function getOrCreateLine(p) {
   if (trailLines.has(p.id)) return trailLines.get(p.id);
   const mat = new LineMaterial({
     color: new THREE.Color(p.color),
-    linewidth: 3,          // pixels
+    linewidth: 6,          // pixels
     resolution: _resolution,
+    depthTest: false,
   });
   const geo  = new LineGeometry();
   const line = new Line2(geo, mat);
@@ -52,7 +53,7 @@ export function updateTrails() {
   }
 
   for (const p of state.players) {
-    if (!p.alive || p.trailPoints.length < 2) {
+    if (!p.alive || p.trailPoints.length < 1) {
       // Hide the line if trail is empty
       const line = trailLines.get(p.id);
       if (line) line.visible = false;
