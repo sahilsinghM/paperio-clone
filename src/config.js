@@ -1,7 +1,7 @@
 export const CFG = {
   GRID_W:            400,
   GRID_H:            400,
-  TICK_RATE:         16,          // physics ticks per second
+  TICK_RATE:         60,          // physics ticks per second (matches render rate → no stutter)
   PLAYER_SPEED:      52,          // grid units per second (off own territory)
   BOOST_SPEED:       72,          // grid units per second (on own territory, no trail)
   TURN_SPEED:        3.5,         // radians per second

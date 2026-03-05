@@ -31,7 +31,7 @@ export function initRenderer(container) {
   container.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x0d1b2a, 0.008);
+  scene.fog = new THREE.FogExp2(0x0d1b2a, 0.004);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
@@ -60,8 +60,9 @@ export function initRenderer(container) {
   grid.position.y = 0.001;
   scene.add(grid);
 
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 15, 12);
+  camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.up.set(0, 0, -1);       // world -Z = screen up (needed for straight-down lookAt)
+  camera.position.set(0, 28, 0);
   camera.lookAt(0, 0, 0);
 
   window.addEventListener('resize', onResize);
@@ -73,6 +74,7 @@ export function onResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.up.set(0, 0, -1);   // preserve top-down orientation after resize
 }
 
 export function cellToWorld(x, y) {
@@ -86,10 +88,11 @@ export function updateCamera3d() {
   const wx = h.x - HALF_W + 0.5;
   const wz = h.y - HALF_H + 0.5;
 
-  // Fixed world-space offset — NO direction dependency.
-  // Camera only reacts to player XZ position (buttery smooth).
-  _camTarget.set(wx, 30, wz + 10);
-  camera.position.lerp(_camTarget, 0.05);
+  // True top-down: camera directly above player, no forward tilt.
+  // Trail is visible in all directions around the player.
+  // camera.up=(0,0,-1) set at init avoids gimbal lock when looking straight down.
+  _camTarget.set(wx, 28, wz);
+  camera.position.lerp(_camTarget, 0.18);   // fast at 60 Hz physics — no perceptible lag
 
   _lookTarget.set(wx, 0, wz);
   camera.lookAt(_lookTarget);
