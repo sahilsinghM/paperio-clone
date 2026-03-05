@@ -33,6 +33,8 @@ function createPlayerMesh(p) {
   body.receiveShadow = false;
   body.position.y    = 0.35;
   group.add(body);
+  group.userData.body    = body;
+  group.userData.bodyMat = bodyMat;
 
   const coneMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const cone    = new THREE.Mesh(coneGeo, coneMat);
@@ -51,7 +53,8 @@ function createPlayerMesh(p) {
   const light = new THREE.PointLight(p.color, 0.8, 4);
   light.position.set(0, 0.5, 0);
   group.add(light);
-  group.userData.light = light;
+  group.userData.light     = light;
+  group.userData.baseColor = new THREE.Color(p.color);
 
   group.position.set(p.x - HALF_W + 0.5, 0, p.y - HALF_H + 0.5);
   return group;
@@ -66,6 +69,8 @@ export function syncPlayerMeshes(scene) {
       playerGroups.delete(id);
     }
   }
+
+  const now = performance.now();
 
   for (const p of state.players) {
     if (!p.alive) {
@@ -89,13 +94,33 @@ export function syncPlayerMeshes(scene) {
     _pos.set(tx, 0, tz);
     group.position.lerp(_pos, 0.3);
 
-    const t = performance.now() / 400;
+    const t = now / 400;
     group.position.y = Math.sin(t + p.id) * 0.05;
 
     const cone = group.userData.cone;
     if (cone) {
       cone.position.set(Math.cos(p.direction) * 0.45, 0.35, Math.sin(p.direction) * 0.45);
       cone.rotation.set(0, -p.direction, Math.PI / 2);
+    }
+
+    // Danger pulse: flash red when trail is dangerously long
+    const inDanger = p.trailPoints.length >= CFG.TRAIL_WARN;
+    const bodyMat  = group.userData.bodyMat;
+    const light    = group.userData.light;
+    const base     = group.userData.baseColor;
+    if (inDanger) {
+      const pulse = 0.5 + 0.5 * Math.abs(Math.sin(now / 220));
+      bodyMat.color.setRGB(
+        base.r + (1 - base.r) * pulse * 0.7,
+        base.g * (1 - pulse * 0.5),
+        base.b * (1 - pulse * 0.5),
+      );
+      light.color.setRGB(1, 0.15, 0.05);
+      light.intensity = 1.2 + pulse * 0.8;
+    } else {
+      bodyMat.color.copy(base);
+      light.color.set(p.color);
+      light.intensity = 0.8;
     }
   }
 }

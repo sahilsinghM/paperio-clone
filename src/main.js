@@ -5,8 +5,9 @@ import { tickAllBots } from './ai.js';
 import { initInput, applyTurnInput } from './input.js';
 import { initTrails, updateTrails } from './trail.js';
 import { initColorPicker, initHUD, drawHUD, tickKillFeed, tickFillAnims, addKillFeed } from './ui.js';
+import { playCapture, playDeath, playKill, playTrailStart } from './sound.js';
 
-import { initRenderer, updateCamera3d, render3d } from './renderer3d.js';
+import { initRenderer, updateCamera3d, render3d, triggerScreenShake } from './renderer3d.js';
 import { initCells, updateCells } from './cells.js';
 import { initPlayerRenderer, syncPlayerMeshes, renderLabels } from './players3d.js';
 
@@ -51,15 +52,32 @@ document.getElementById('respawn-btn').addEventListener('click', () => {
   requestAnimationFrame(gameLoop);
 });
 
+// ─── Sound + shake wiring ─────────────────────────────────────────────────────
+
+// Track when trail left home so we can play the trail-start blip once
+let _hadTrail = false;
+
+window.addEventListener('territoryCaptured', e => {
+  if (!e.detail.player.isBot) playCapture();
+});
+
 window.addEventListener('playerKilled', e => {
   const { killer, victim, pct } = e.detail;
   if (killer) addKillFeed(killer.name, victim.name, killer.color, victim.color);
+
   if (!victim.isBot) {
+    // Human died
+    playDeath();
+    triggerScreenShake(400, 0.8);
+    _hadTrail = false;
     state.gameRunning = false;
     document.getElementById('death-killer').textContent    = killer ? killer.name : 'the boundary';
     document.getElementById('death-territory').textContent = pct + '%';
     document.getElementById('death-kills').textContent     = victim.kills;
     document.getElementById('death-screen').classList.remove('hidden');
+  } else if (killer && !killer.isBot) {
+    // Human made a kill
+    playKill();
   }
 });
 
@@ -68,6 +86,15 @@ function gameLoop(ts) {
   const dt=Math.min(ts-state.lastTime,100);
   state.lastTime=ts; state.tickAccum+=dt;
   applyTurnInput();
+
+  // Trail-start sound: blip once when human first leaves home territory
+  const h = state.humanPlayer;
+  if (h && h.alive) {
+    const hasTrail = h.trailPoints.length > 0;
+    if (hasTrail && !_hadTrail) { playTrailStart(); _hadTrail = true; }
+    if (!hasTrail)               _hadTrail = false;
+  }
+
   while (state.tickAccum>=TICK_MS) {
     tickAllBots(TICK_MS); tickPlayers(TICK_MS);
     state.tickAccum-=TICK_MS;

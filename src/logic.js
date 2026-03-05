@@ -27,9 +27,10 @@ export function createPlayer(name, color, isBot = false) {
 }
 
 export function stampHome(p) {
+  const r  = CFG.HOME_RADIUS;
   const gx = Math.floor(p.x), gy = Math.floor(p.y);
-  for (let dy = -2; dy <= 2; dy++)
-    for (let dx = -2; dx <= 2; dx++)
+  for (let dy = -r; dy <= r; dy++)
+    for (let dx = -r; dx <= r; dx++)
       if (inBounds(gx+dx, gy+dy))
         territory[idx(gx+dx, gy+dy)] = p.id;
 }
@@ -98,9 +99,15 @@ export function movePlayer(p, dt) {
   // Apply turn
   p.direction += p.turnInput * CFG.TURN_SPEED * (dt / 1000);
 
+  // Speed boost when fully inside own territory (no trail risk)
+  const gx = Math.floor(p.x), gy = Math.floor(p.y);
+  const onOwn = inBounds(gx, gy) && territory[idx(gx, gy)] === p.id;
+  const boosting = onOwn && p.trailPoints.length === 0;
+  const spd = boosting ? CFG.BOOST_SPEED : CFG.PLAYER_SPEED;
+
   // Compute new position
-  const nx = p.x + Math.cos(p.direction) * p.speed * (dt / 1000);
-  const ny = p.y + Math.sin(p.direction) * p.speed * (dt / 1000);
+  const nx = p.x + Math.cos(p.direction) * spd * (dt / 1000);
+  const ny = p.y + Math.sin(p.direction) * spd * (dt / 1000);
 
   // Boundary: reflect at edges
   const M = 0.8;
@@ -114,8 +121,8 @@ export function movePlayer(p, dt) {
   if (enemy)                         { killPlayer(enemy, p); return; }
 
   // Trail recording + territory reconnect
-  const gx = Math.floor(p.x), gy = Math.floor(p.y);
-  const cellOwner = inBounds(gx, gy) ? territory[idx(gx, gy)] : 0;
+  const gx2 = Math.floor(p.x), gy2 = Math.floor(p.y);
+  const cellOwner = inBounds(gx2, gy2) ? territory[idx(gx2, gy2)] : 0;
 
   if (cellOwner === p.id && p.trailPoints.length > 0) {
     claimTerritory(p);
@@ -231,6 +238,7 @@ export function claimTerritory(p) {
 
   if (newCells.size > 0) {
     state.fillAnims.push({ cells: newCells, color: p.color, startTime: performance.now() });
+    window.dispatchEvent(new CustomEvent('territoryCaptured', { detail: { player: p, cells: newCells.size } }));
   }
 }
 
