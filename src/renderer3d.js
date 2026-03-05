@@ -13,10 +13,12 @@ const _lookTarget = new THREE.Vector3();
 // ─── Screen shake ────────────────────────────────────────────────────────────
 let _shakeEnd       = 0;
 let _shakeIntensity = 0;
+let _shakePhase     = 0;
 
-export function triggerScreenShake(durationMs = 350, intensity = 0.6) {
+export function triggerScreenShake(durationMs = 350, intensity = 0.5) {
   _shakeEnd       = performance.now() + durationMs;
   _shakeIntensity = intensity;
+  _shakePhase     = 0;
 }
 
 export function initRenderer(container) {
@@ -84,22 +86,24 @@ export function updateCamera3d() {
   const wx = h.x - HALF_W + 0.5;
   const wz = h.y - HALF_H + 0.5;
 
-  const behindX = -Math.cos(h.direction) * 12;
-  const behindZ = -Math.sin(h.direction) * 12;
-  _camTarget.set(wx + behindX, 15, wz + behindZ);
-  camera.position.lerp(_camTarget, 0.12);
+  // Paper.io 2 style: nearly top-down, slight forward tilt, no rotation swing
+  // height=28, behind=6 → ~78° from horizontal (vs old 51°)
+  const behindX = -Math.cos(h.direction) * 6;
+  const behindZ = -Math.sin(h.direction) * 6;
+  _camTarget.set(wx + behindX, 28, wz + behindZ);
+  camera.position.lerp(_camTarget, 0.06);   // gentle lerp → no swing jitter
 
   _lookTarget.set(wx, 0, wz);
   camera.lookAt(_lookTarget);
 
-  // Screen shake
+  // Screen shake — smooth sine wave (no per-frame random jitter)
   const now = performance.now();
   if (now < _shakeEnd) {
-    const t = (_shakeEnd - now) / 350;           // 1→0 as shake fades
+    const t = (_shakeEnd - now) / 400;          // 1→0 as shake fades out
+    _shakePhase += 0.35;
     const s = t * _shakeIntensity;
-    camera.position.x += (Math.random() - 0.5) * s;
-    camera.position.y += (Math.random() - 0.5) * s * 0.4;
-    camera.position.z += (Math.random() - 0.5) * s;
+    camera.position.x += Math.sin(_shakePhase * 2.1) * s;
+    camera.position.z += Math.sin(_shakePhase * 1.7 + 1) * s;
   }
 
   sun.position.set(wx + 100, 150, wz + 80);
