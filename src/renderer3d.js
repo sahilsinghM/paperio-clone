@@ -86,12 +86,10 @@ export function updateCamera3d() {
   const wx = h.x - HALF_W + 0.5;
   const wz = h.y - HALF_H + 0.5;
 
-  // Paper.io 2 style: nearly top-down, slight forward tilt, no rotation swing
-  // height=28, behind=6 → ~78° from horizontal (vs old 51°)
-  const behindX = -Math.cos(h.direction) * 6;
-  const behindZ = -Math.sin(h.direction) * 6;
-  _camTarget.set(wx + behindX, 28, wz + behindZ);
-  camera.position.lerp(_camTarget, 0.06);   // gentle lerp → no swing jitter
+  // Fixed world-space offset — NO direction dependency.
+  // Camera only reacts to player XZ position (buttery smooth).
+  _camTarget.set(wx, 30, wz + 10);
+  camera.position.lerp(_camTarget, 0.05);
 
   _lookTarget.set(wx, 0, wz);
   camera.lookAt(_lookTarget);
