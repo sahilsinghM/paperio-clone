@@ -5,9 +5,19 @@ const held = new Set();
 const TURN_LEFT  = new Set(['ArrowLeft','a','A']);
 const TURN_RIGHT = new Set(['ArrowRight','d','D']);
 
+// Max knob displacement from joystick center (px)
+const JOYSTICK_RADIUS = 35;
+// Dead zone: ignore tiny movements
+const JOYSTICK_DEAD = 10;
+
+let joystickActive = false;
+let joystickCenter = null;
+
 export function applyTurnInput() {
   const h = state.humanPlayer;
   if (!h || !h.alive) return;
+  // Joystick sets direction directly; only apply keyboard turning when joystick is idle
+  if (joystickActive) return;
   let t = 0;
   for (const k of held) {
     if (TURN_LEFT.has(k))  { t = -1; break; }
@@ -25,7 +35,7 @@ export function initInput(canvas) {
   });
   document.addEventListener('keyup', e => held.delete(e.key));
 
-  // Touch swipe → set player direction angle
+  // Touch swipe on canvas → set player direction angle
   let touchStart = null;
   canvas.addEventListener('touchstart', e => {
     touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -40,13 +50,55 @@ export function initInput(canvas) {
     if (h && h.alive) h.direction = Math.atan2(dy, dx);
   }, { passive: true });
 
-  // D-pad: hold down = turn, release = straight
-  document.querySelectorAll('.dpad-btn').forEach(btn => {
-    const dir = btn.dataset.dir;
-    const key = dir === 'left' ? 'ArrowLeft' : dir === 'right' ? 'ArrowRight' : null;
-    if (!key) return;
-    btn.addEventListener('pointerdown', () => held.add(key));
-    btn.addEventListener('pointerup',   () => held.delete(key));
-    btn.addEventListener('pointerleave',() => held.delete(key));
-  });
+  // Virtual joystick
+  const joystick = document.getElementById('joystick');
+  const knob = document.getElementById('joystick-knob');
+
+  function updateJoystick(clientX, clientY) {
+    const dx = clientX - joystickCenter.x;
+    const dy = clientY - joystickCenter.y;
+    const dist = Math.hypot(dx, dy);
+    const clamped = Math.min(dist, JOYSTICK_RADIUS);
+    const angle = Math.atan2(dy, dx);
+
+    // Move knob visually (clamped inside ring)
+    const kx = Math.cos(angle) * clamped;
+    const ky = Math.sin(angle) * clamped;
+    knob.style.transform = `translate(${kx}px, ${ky}px)`;
+
+    // Set player heading when past dead zone
+    if (dist > JOYSTICK_DEAD) {
+      const h = state.humanPlayer;
+      if (h && h.alive) {
+        h.direction = angle;
+        h.turnInput = 0;
+      }
+    }
+  }
+
+  function resetKnob() {
+    joystickActive = false;
+    joystickCenter = null;
+    knob.style.transform = 'translate(0px, 0px)';
+  }
+
+  joystick.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const rect = joystick.getBoundingClientRect();
+    joystickCenter = {
+      x: rect.left + rect.width  / 2,
+      y: rect.top  + rect.height / 2,
+    };
+    joystickActive = true;
+    updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+
+  joystick.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!joystickActive) return;
+    updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+
+  joystick.addEventListener('touchend',   resetKnob, { passive: true });
+  joystick.addEventListener('touchcancel', resetKnob, { passive: true });
 }

@@ -68,25 +68,25 @@
     }
     @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } }
 
-    #dpad {
-      position: fixed; bottom: 24px; left: 24px;
-      display: none; z-index: 50;
+    #joystick {
+      position: fixed; bottom: 40px; left: 40px;
+      width: 120px; height: 120px; border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 2px solid rgba(255,255,255,0.25);
+      display: none; align-items: center; justify-content: center;
+      touch-action: none; z-index: 50;
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.06);
     }
     @media (max-width: 768px) {
-      #dpad {
-        display: grid;
-        grid-template-columns: 48px 48px 48px;
-        grid-template-rows: 48px 48px 48px;
-        gap: 4px;
-      }
+      #joystick { display: flex; }
     }
-    .dpad-btn {
-      background: rgba(255,255,255,0.15); border: none; border-radius: 8px;
-      color: #fff; font-size: 1.4rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.1s;
+    #joystick-knob {
+      width: 50px; height: 50px; border-radius: 50%;
+      background: rgba(255,255,255,0.65);
+      border: 2px solid rgba(255,255,255,0.9);
+      position: absolute; pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     }
-    .dpad-btn:active { background: rgba(255,255,255,0.35); }
   </style>
 </head>
 <body>
@@ -110,16 +110,8 @@
 
 <div id="kill-feed"></div>
 
-<div id="dpad">
-  <div></div>
-  <button class="dpad-btn" data-dir="up" aria-label="Move up">↑</button>
-  <div></div>
-  <button class="dpad-btn" data-dir="left" aria-label="Move left">←</button>
-  <div></div>
-  <button class="dpad-btn" data-dir="right" aria-label="Move right">→</button>
-  <div></div>
-  <button class="dpad-btn" data-dir="down" aria-label="Move down">↓</button>
-  <div></div>
+<div id="joystick">
+  <div id="joystick-knob"></div>
 </div>
 
 <canvas id="game"></canvas>
