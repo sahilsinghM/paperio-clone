@@ -41,7 +41,8 @@ namespace PaperIO.Core
 
         // ── State machine ──────────────────────────────────────────────────────
         public enum GameState { Start, Playing, Dead, Respawning }
-        public GameState State { get; private set; } = GameState.Start;
+        public GameState State          { get; private set; } = GameState.Start;
+        private GameState _previousState = GameState.Start;
 
         // ── Player registry ────────────────────────────────────────────────────
         // All active players (human + bots) keyed by playerId.
@@ -109,6 +110,7 @@ namespace PaperIO.Core
 
         public void SetState(GameState newState)
         {
+            _previousState = State;
             State = newState;
             switch (newState)
             {
@@ -118,7 +120,11 @@ namespace PaperIO.Core
 
                 case GameState.Playing:
                     SpawnHumanPlayer();
-                    botSpawner.SpawnInitialBots();
+                    // Only do the initial bot population on the very first play
+                    // (Start → Playing). On respawn the bots are already alive and
+                    // managed by BotSpawner's own respawn coroutines.
+                    if (_previousState == GameState.Start)
+                        botSpawner.SpawnInitialBots();
                     break;
 
                 case GameState.Dead:
@@ -149,7 +155,7 @@ namespace PaperIO.Core
         private IEnumerator RespawnHuman()
         {
             yield return new WaitForSeconds(0.1f);
-            SpawnHumanPlayer();
+            // SetState(Playing) calls SpawnHumanPlayer() internally — don't call it here too.
             SetState(GameState.Playing);
         }
 

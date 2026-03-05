@@ -85,6 +85,9 @@ namespace PaperIO.Player
             _territory = GameManager.Instance.territorySystem;
             _trail     = GameManager.Instance.trailSystem;
 
+            // Create LineRenderers for this player's trail.
+            _trail.RegisterPlayer(PlayerId, PlayerColor);
+
             // Position on map.
             transform.position = new Vector3(spawnCell.x + 0.5f, 0f, spawnCell.y + 0.5f);
             _angle = Random.value * Mathf.PI * 2f;

@@ -71,7 +71,8 @@ namespace PaperIO.UI
         [Tooltip("Prefab for a single kill feed entry.")]
         public GameObject killFeedPrefab;
 
-        private readonly List<GameObject> _killFeedEntries = new();
+        // Pairs of (gameObject, spawnTime) so entries can be expired cleanly.
+        private readonly List<(GameObject go, float spawnTime)> _killFeedEntries = new();
 
         // ── Minimap ────────────────────────────────────────────────────────────
         [Header("Minimap")]
@@ -301,25 +302,8 @@ namespace PaperIO.UI
 
         public void RefreshKillFeed(List<KillFeedEntry> entries)
         {
-            if (killFeedContainer == null) return;
-
-            // Remove expired entries.
-            float now = Time.time;
-            for (int i = _killFeedEntries.Count - 1; i >= 0; i--)
-            {
-                if (_killFeedEntries[i] == null) { _killFeedEntries.RemoveAt(i); continue; }
-                var txt = _killFeedEntries[i].GetComponentInChildren<TMP_Text>();
-                if (txt == null || now - float.Parse(txt.GetComponent<TMP_Text>().text.Split('|')[1]) > _config.killFeedDuration)
-                {
-                    Destroy(_killFeedEntries[i]);
-                    _killFeedEntries.RemoveAt(i);
-                }
-            }
-
-            // Add latest entry.
-            if (entries.Count == 0) return;
-            var latest = entries[entries.Count - 1];
-            AddKillFeedEntry(latest);
+            if (killFeedContainer == null || entries.Count == 0) return;
+            AddKillFeedEntry(entries[entries.Count - 1]);
         }
 
         private void AddKillFeedEntry(KillFeedEntry entry)
@@ -333,17 +317,16 @@ namespace PaperIO.UI
             var txt = go.GetComponentInChildren<TMP_Text>();
             if (txt != null)
             {
-                // Encode timestamp in text for expiry (simple approach).
-                txt.text  = $"{entry.killerName} eliminated {entry.victimName}|{entry.timestamp}";
+                txt.text  = $"{entry.killerName} eliminated {entry.victimName}";
                 txt.color = Color.white;
             }
 
-            _killFeedEntries.Add(go);
+            _killFeedEntries.Add((go, Time.time));
 
-            // Limit visible entries.
+            // Cap at 5 visible entries; remove oldest.
             while (_killFeedEntries.Count > 5)
             {
-                Destroy(_killFeedEntries[0]);
+                Destroy(_killFeedEntries[0].go);
                 _killFeedEntries.RemoveAt(0);
             }
         }
@@ -358,9 +341,15 @@ namespace PaperIO.UI
 
         private void CleanKillFeed()
         {
+            float now = Time.time;
             for (int i = _killFeedEntries.Count - 1; i >= 0; i--)
             {
-                if (_killFeedEntries[i] == null) { _killFeedEntries.RemoveAt(i); }
+                var (go, spawnTime) = _killFeedEntries[i];
+                if (go == null || now - spawnTime > _config.killFeedDuration)
+                {
+                    if (go != null) Destroy(go);
+                    _killFeedEntries.RemoveAt(i);
+                }
             }
         }
 

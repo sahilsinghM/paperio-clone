@@ -105,11 +105,13 @@ namespace PaperIO.AI
         {
             yield return new WaitForSeconds(_config.botRespawnDelay);
 
-            // Remove old entry.
+            // Remove old entry and clean up all per-player subsystem state.
             if (_bots.TryGetValue(oldBotId, out var oldBot))
             {
                 _bots.Remove(oldBotId);
                 GameManager.Instance.UnregisterPlayer(oldBotId);
+                // Destroy the trail LineRenderers owned by TrailSystem.
+                GameManager.Instance.trailSystem.UnregisterPlayer(oldBotId);
                 if (oldBot != null)
                     Destroy(oldBot.gameObject);
             }

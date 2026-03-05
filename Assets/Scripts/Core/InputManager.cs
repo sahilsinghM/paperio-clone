@@ -48,15 +48,17 @@ namespace PaperIO.Core
         {
             TurnInput = 0f;
 
-#if UNITY_EDITOR || UNITY_STANDALONE || UNITY_WEBGL
-            ReadKeyboard();
-            ReadMouse();
-#endif
             ReadTouch();
 
-            // Joystick overrides keyboard when active.
+            // Touch joystick takes priority; fall back to mouse/keyboard on
+            // platforms that support a pointer.
             if (!JoystickActive)
+            {
+#if UNITY_EDITOR || UNITY_STANDALONE || UNITY_WEBGL
+                ReadMouse();
                 ReadKeyboard();
+#endif
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
