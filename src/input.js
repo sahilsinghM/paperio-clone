@@ -82,15 +82,20 @@ export function initInput(canvas) {
     knob.style.transform = 'translate(0px, 0px)';
   }
 
-  joystick.addEventListener('touchstart', e => {
-    e.preventDefault();
+  function startJoystick(clientX, clientY) {
     const rect = joystick.getBoundingClientRect();
     joystickCenter = {
       x: rect.left + rect.width  / 2,
       y: rect.top  + rect.height / 2,
     };
     joystickActive = true;
-    updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
+    updateJoystick(clientX, clientY);
+  }
+
+  // Touch events
+  joystick.addEventListener('touchstart', e => {
+    e.preventDefault();
+    startJoystick(e.touches[0].clientX, e.touches[0].clientY);
   }, { passive: false });
 
   joystick.addEventListener('touchmove', e => {
@@ -99,6 +104,18 @@ export function initInput(canvas) {
     updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
   }, { passive: false });
 
-  joystick.addEventListener('touchend',   resetKnob, { passive: true });
+  joystick.addEventListener('touchend',    resetKnob, { passive: true });
   joystick.addEventListener('touchcancel', resetKnob, { passive: true });
+
+  // Mouse events (desktop)
+  joystick.addEventListener('mousedown', e => {
+    startJoystick(e.clientX, e.clientY);
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!joystickActive) return;
+    updateJoystick(e.clientX, e.clientY);
+  });
+
+  document.addEventListener('mouseup', resetKnob);
 }
