@@ -45,7 +45,7 @@ function createPlayerMesh(p) {
   labelDiv.style.cssText = 'color:#fff;font:bold 11px sans-serif;text-shadow:0 1px 3px #000;pointer-events:none;';
   labelDiv.textContent   = p.name;
   const label = new CSS2DObject(labelDiv);
-  label.position.set(0, 1.2, 0);
+  label.position.set(0, 0.85, 0);
   group.add(label);
 
   const light = new THREE.PointLight(p.color, 0.8, 4);
