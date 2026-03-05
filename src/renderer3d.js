@@ -75,10 +75,10 @@ export function updateCamera3d() {
   const wx = h.x - HALF_W + 0.5;
   const wz = h.y - HALF_H + 0.5;
 
-  const behindX = -Math.cos(h.direction) * 14;
-  const behindZ = -Math.sin(h.direction) * 14;
-  _camTarget.set(wx + behindX, 18, wz + behindZ);
-  camera.position.lerp(_camTarget, 0.05);
+  const behindX = -Math.cos(h.direction) * 12;
+  const behindZ = -Math.sin(h.direction) * 12;
+  _camTarget.set(wx + behindX, 15, wz + behindZ);
+  camera.position.lerp(_camTarget, 0.12);
 
   _lookTarget.set(wx, 0, wz);
   camera.lookAt(_lookTarget);

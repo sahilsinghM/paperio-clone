@@ -66,13 +66,16 @@ export function initInput(canvas) {
     const ky = Math.sin(angle) * clamped;
     knob.style.transform = `translate(${kx}px, ${ky}px)`;
 
-    // Set player heading when past dead zone
+    const h = state.humanPlayer;
+    if (!h || !h.alive) return;
+
     if (dist > JOYSTICK_DEAD) {
-      const h = state.humanPlayer;
-      if (h && h.alive) {
-        h.direction = angle;
-        h.turnInput = 0;
-      }
+      // X axis of joystick → turn left/right (camera-independent, intuitive)
+      // Normalise to [-1, 1] across the full radius
+      const nx = dx / JOYSTICK_RADIUS;
+      h.turnInput = nx > 0.25 ? 1 : nx < -0.25 ? -1 : 0;
+    } else {
+      h.turnInput = 0;
     }
   }
 
@@ -80,6 +83,8 @@ export function initInput(canvas) {
     joystickActive = false;
     joystickCenter = null;
     knob.style.transform = 'translate(0px, 0px)';
+    const h = state.humanPlayer;
+    if (h) h.turnInput = 0;
   }
 
   function startJoystick(clientX, clientY) {
